@@ -1,0 +1,70 @@
+diff -aur a/include/libbb.h b/include/libbb.h
+--- a/include/libbb.h
++++ b/include/libbb.h
+@@ -107,14 +107,12 @@
+ #  define _PATH_UTMPX _PATH_UTMP
+ # else
+ #  if !defined(__FreeBSD__)
+-#   include <utmp.h>
++#   include <utmps/utmps.h>
++#   define _CORRECT_PATH_UTMPX "/run/utmps/utmp"
++#   define _CORRECT_PATH_WTMP "/var/log/wtmp"
+ #  else
+ #   define _PATH_UTMPX "/var/run/utx.active"
+ #  endif
+-#  include <utmpx.h>
+-#  if defined _PATH_UTMP && !defined _PATH_UTMPX
+-#   define _PATH_UTMPX _PATH_UTMP
+-#  endif
+ # endif
+ #endif
+ #if ENABLE_LOCALE_SUPPORT
+diff -aur a/libbb/messages.c b/libbb/messages.c
+--- a/libbb/messages.c
++++ b/libbb/messages.c
+@@ -42,8 +42,8 @@
+ #if ENABLE_FEATURE_WTMP
+ /* This is usually something like "/var/adm/wtmp" or "/var/log/wtmp" */
+ const char bb_path_wtmp_file[] ALIGN1 =
+-# if defined _PATH_WTMP
+-	_PATH_WTMP;
++# if defined _CORRECT_PATH_WTMP
++	_CORRECT_PATH_WTMP;
+ # elif defined WTMP_FILE
+ 	WTMP_FILE;
+ # else
+diff -aur a/libbb/utmp.c b/libbb/utmp.c
+--- a/libbb/utmp.c
++++ b/libbb/utmp.c
+@@ -45,8 +45,7 @@
+ 		tty_name += 3;
+ 	strncpy(id, tty_name, width);
+ 
+-	touch(_PATH_UTMPX);
+-	//utmpxname(_PATH_UTMPX);
++	utmpxname(_CORRECT_PATH_UTMPX);
+ 	setutxent();
+ 	/* Append new one (hopefully, unless we collide on ut_id) */
+ 	pututxline(&utent);
+@@ -67,8 +66,7 @@
+ 	struct utmpx utent;
+ 	struct utmpx *utp;
+ 
+-	touch(_PATH_UTMPX);
+-	//utmpxname(_PATH_UTMPX);
++	utmpxname(_CORRECT_PATH_UTMPX);
+ 	setutxent();
+ 
+ 	/* Did init/getty/telnetd/sshd/... create an entry for us?
+diff -aur a/util-linux/last_fancy.c b/util-linux/last_fancy.c
+--- a/util-linux/last_fancy.c
++++ b/util-linux/last_fancy.c
+@@ -159,7 +159,7 @@
+ int last_main(int argc UNUSED_PARAM, char **argv)
+ {
+ 	struct utmpx ut;
+-	const char *filename = _PATH_WTMP;
++	const char *filename = _CORRECT_PATH_WTMP;
+ 	llist_t *zlist;
+ 	off_t pos;
+ 	time_t start_time;
