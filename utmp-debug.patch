@@ -1,0 +1,342 @@
+diff -aur b/libbb/utmp.c c/libbb/utmp.c
+--- b/libbb/utmp.c	2022-06-02 20:38:30.008009412 +0100
++++ c/libbb/utmp.c	2022-06-02 20:37:09.187569044 +0100
+@@ -20,43 +20,66 @@
+ 	char *id;
+ 	unsigned width;
+ 
++	struct utmpx *rc_struct;
++	bb_info_msg("Entered write_new_utmp");
++
+ 	memset(&utent, 0, sizeof(utent));
+ 	utent.ut_pid = pid;
++	bb_info_msg("write_new_utmp: ut_pid = %d", pid);
+ 	utent.ut_type = new_type;
++	bb_info_msg("write_new_utmp: ut_type = %d", new_type);
+ 	tty_name = skip_dev_pfx(tty_name);
+ 	safe_strncpy(utent.ut_line, tty_name, sizeof(utent.ut_line));
+-	if (username)
++	bb_info_msg("write_new_utmp: ut_line = %s", tty_name);
++	if (username) {
+ 		safe_strncpy(utent.ut_user, username, sizeof(utent.ut_user));
+-	if (hostname)
++		bb_info_msg("write_new_utmp: ut_user = %s", username);
++	}
++	if (hostname) {
+ 		safe_strncpy(utent.ut_host, hostname, sizeof(utent.ut_host));
++		bb_info_msg("write_new_utmp: ut_hostname = %s", hostname);
++		}
+ 	utent.ut_tv.tv_sec = time(NULL);
+ 
+ 	/* Invent our own ut_id. ut_id is only 4 chars wide.
+ 	 * Try to fit something remotely meaningful... */
++	bb_info_msg("write_new_utmp: ut_id: %s", utent.ut_id);
+ 	id = utent.ut_id;
+ 	width = sizeof(utent.ut_id);
+ 	if (tty_name[0] == 'p') {
+ 		/* if "ptyXXX", map to "pXXX" */
+ 		/* if "pts/XX", map to "p/XX" */
+ 		*id++ = 'p';
++		bb_info_msg("write_new_utmp: for tty name beginning 'p' id: %s", id);
+ 		width--;
+ 	} /* else: usually it's "ttyXXXX", map to "XXXX" */
+ 	if (strlen(tty_name) > 3)
+ 		tty_name += 3;
+ 	strncpy(id, tty_name, width);
++	bb_info_msg("write_new_utmp: id: %s, ut_id: %s", id, utent.ut_id);
+ 
+ 	//touch(_CORRECT_PATH_UTMPX);
+ 	//utmpxname(_CORRECT_PATH_UTMPX);
+ 	setutxent();
+ 	/* Append new one (hopefully, unless we collide on ut_id) */
+-	pututxline(&utent);
++	bb_info_msg("write_new_utmp: calling pututxline");
++	rc_struct = pututxline(&utent);
++	if (rc_struct == NULL) {
++		bb_info_msg("write_new_utmp: called pututxline but NULL returned");
++	}
++	else {
++		bb_info_msg("write_new_utmp: called pututxline ok");
++	}
+ 	endutxent();
+ 
+ #if ENABLE_FEATURE_WTMP
+ 	/* "man utmp" says wtmp file should *not* be created automagically */
+ 	/*touch(bb_path_wtmp_file);*/
++	bb_info_msg("write_new_utmp: calling updwtmpx with file: %s", bb_path_wtmp_file);
+ 	updwtmpx(bb_path_wtmp_file, &utent);
+ #endif
++
++	bb_info_msg("Leaving write_new_utmp");
+ }
+ 
+ /*
+@@ -67,6 +90,9 @@
+ 	struct utmpx utent;
+ 	struct utmpx *utp;
+ 
++	struct utmpx *rc_struct;
++	bb_info_msg("Entered update_utmp, file is: %s", _CORRECT_PATH_UTMPX);
++
+ 	//touch(_CORRECT_PATH_UTMPX);
+ 	//utmpxname(_CORRECT_PATH_UTMPX);
+ 	setutxent();
+@@ -99,10 +125,14 @@
+ 	//the situation when utmp file is positioned on found record
+ 
+ 	if (!utp) {
+-		if (new_type != DEAD_PROCESS)
++		if (new_type != DEAD_PROCESS) {
++			bb_info_msg("update_utmp: about to call write_new_utmp");
+ 			write_new_utmp(pid, new_type, tty_name, username, hostname);
+-		else
++		}
++		else {
++			bb_info_msg("update_utmp: about to call endutxent");
+ 			endutxent();
++		}
+ 		return;
+ 	}
+ 
+@@ -121,14 +151,24 @@
+ 
+ 	/* Update, or append new one */
+ 	//setutxent();
+-	pututxline(&utent);
++	bb_info_msg("update_utmp: about to call pututxline");
++	rc_struct = pututxline(&utent);
++	if (rc_struct == NULL) {
++		bb_info_msg("update_utmp: called pututxline but NULL returned");
++	}
++	else {
++		bb_info_msg("update__utmp: called pututxline ok");
++	}
+ 	endutxent();
+ 
+ #if ENABLE_FEATURE_WTMP
+ 	/* "man utmp" says wtmp file should *not* be created automagically */
+ 	/*touch(bb_path_wtmp_file);*/
++	bb_info_msg("update_utmp: about to call updwtmpx with file: %s", bb_path_wtmp_file);
+ 	updwtmpx(bb_path_wtmp_file, &utent);
+ #endif
++
++	bb_info_msg("Leaving update_utmp");
+ }
+ 
+ /* man utmp:
+@@ -142,5 +182,9 @@
+  */
+ void FAST_FUNC update_utmp_DEAD_PROCESS(pid_t pid)
+ {
++	bb_info_msg("Entered update_utmp_DEAD_PROCESS, pid is: %d", pid);
++
+ 	update_utmp(pid, DEAD_PROCESS, NULL, NULL, NULL);
++
++	bb_info_msg("Leaving update_utmp_DEAD_PROCESS");
+ }
+diff -aur b/loginutils/getty.c c/loginutils/getty.c
+--- b/loginutils/getty.c	2022-05-31 01:41:04.159171675 +0100
++++ c/loginutils/getty.c	2022-05-31 01:47:20.109260878 +0100
+@@ -671,6 +671,8 @@
+ 	if (tcgetattr(STDIN_FILENO, &G.tty_attrs) < 0)
+ 		bb_simple_perror_msg_and_die("tcgetattr");
+ 
++	bb_info_msg("about to call update_utmp for pid '%d', LOGIN_PROCESS, tty '%s', 'LOGIN'", pid, G.tty_name);
++
+ 	/* Update the utmp file. This tty is ours now! */
+ 	update_utmp(pid, LOGIN_PROCESS, G.tty_name, "LOGIN", G.fakehost);
+ 
+diff -aur b/Makefile c/Makefile
+--- b/Makefile	2022-06-02 19:13:36.947854966 +0100
++++ c/Makefile	2022-06-02 19:17:29.337184653 +0100
+@@ -720,6 +720,8 @@
+ 	$(Q)rm -f .old_version
+ 
+ busybox: busybox_unstripped
++	@echo '  AAA, Running nm to check symbols'
++	nm -a busybox_unstripped
+ ifeq ($(SKIP_STRIP),y)
+ 	$(Q)cp $< $@
+ else
+diff -aur b/scripts/trylink c/scripts/trylink
+--- b/scripts/trylink	2022-06-01 15:39:18.485745607 +0100
++++ c/scripts/trylink	2022-06-02 19:11:21.219074194 +0100
+@@ -1,7 +1,7 @@
+ #!/bin/sh
+ 
+-#debug=true
+-debug=false
++debug=true
++#debug=false
+ 
+ # Linker flags used:
+ #
+@@ -86,6 +86,9 @@
+ LDLIBS="$7"
+ CONFIG_EXTRA_LDLIBS="$8"
+ 
++echo "BEGIN, CONFIG_EXTRA_LDLIBS: $CONFIG_EXTRA_LDLIBS"
++
++
+ # The --sort-section option is not supported by older versions of ld
+ SORT_SECTION="-Wl,--sort-section,alignment"
+ if ! check_cc "-Wl,--sort-section,alignment"; then
+@@ -133,6 +136,8 @@
+ echo "Trying libraries: $LDLIBS"
+ # "lib1 lib2 lib3" -> "-llib1 -llib2 -llib3"
+ l_list=`echo " $LDLIBS $CONFIG_EXTRA_LDLIBS " | sed -e 's: \([^- ][^ ]*\): -l\1:g' -e 's/^ *//'`
++echo "A, CONFIG_EXTRA_LDLIBS: $CONFIG_EXTRA_LDLIBS"
++echo "A, l_list: $l_list"
+ test x"$l_list" != x"" && l_list="$START_GROUP $l_list $END_GROUP"
+ try $CC $CFLAGS $LDFLAGS \
+ 	-o $EXE \
+@@ -151,6 +156,7 @@
+ 
+ # Now try to remove each lib and build without it.
+ # Stop when no lib can be removed.
++echo "A start loop, LDLIBS: $LDLIBS"
+ while test "$LDLIBS"; do
+     $debug && echo "Trying libraries: $LDLIBS"
+     dropped_non_first_lib=false
+@@ -159,6 +165,8 @@
+ 	without_one=`echo " $LDLIBS " | sed "s/ $one / /g" | xargs`
+ 	# "lib1 lib2 lib3" -> "-llib1 -llib2 -llib3"
+ 	l_list=`echo " $without_one $CONFIG_EXTRA_LDLIBS " | sed -e 's: \([^- ][^ ]*\): -l\1:g' -e 's/^ *//'`
++	echo "AA, CONFIG_EXTRA_LDLIBS: $CONFIG_EXTRA_LDLIBS"
++	echo "AA, l_list: $l_list"
+ 	test x"$l_list" != x"" && l_list="$START_GROUP $l_list $END_GROUP"
+ 	$debug && echo "Trying -l options: '$l_list'"
+ 	try $CC $CFLAGS $LDFLAGS \
+@@ -184,12 +192,17 @@
+     $dropped_non_first_lib || break
+ done
+ 
++echo "B, CONFIG_EXTRA_LDLIBS: $CONFIG_EXTRA_LDLIBS"
++
+ # Make the binary with final, minimal list of libs
+ echo "Final link with: ${LDLIBS:-<none>}"
+ l_list=`echo " $LDLIBS $CONFIG_EXTRA_LDLIBS " | sed -e 's: \([^- ][^ ]*\): -l\1:g' -e 's/^ *//'`
++echo "B, l_list: $l_list"
+ test x"$l_list" != x"" && l_list="$START_GROUP $l_list $END_GROUP"
++echo "C, l_list: $l_list"
+ # --verbose gives us gobs of info to stdout (e.g. linker script used)
+ if ! test -f busybox_ldscript; then
++    echo "DD check"
+     try $CC $CFLAGS $LDFLAGS \
+ 	    -o $EXE \
+ 	    $SORT_COMMON \
+@@ -199,10 +212,17 @@
+ 	    $l_list \
+ 	    `INFO_OPTS` \
+     || {
++	echo "DD, showing output"
+ 	cat $EXE.out
+ 	exit 1
+     }
++
++    echo "DDD, link output:"
++    cat $EXE.out
++    echo "DDD, done"
++
+ else
++    echo "EE check"
+     echo "Custom linker script 'busybox_ldscript' found, using it"
+     # Add SORT_BY_ALIGNMENT to linker script (found in $EXE.out):
+     #  .rodata         : { *(.rodata SORT_BY_ALIGNMENT(.rodata.*) .gnu.linkonce.r.*) }
+@@ -230,16 +250,20 @@
+ 	    $l_list \
+ 	    `INFO_OPTS` \
+     || {
++	echo "EE, showing output"
+ 	cat $EXE.out
+ 	exit 1
+     }
+ fi
+ 
++echo "pre FF check"
++
+ . ./.config
+ 
+ sharedlib_dir="0_lib"
+ 
+ if test "$CONFIG_BUILD_LIBBUSYBOX" = y; then
++    echo "FF check"
+     mkdir "$sharedlib_dir" 2>/dev/null
+     test -d "$sharedlib_dir" || {
+ 	echo "Cannot make directory $sharedlib_dir"
+@@ -252,6 +276,7 @@
+     test "$CONFIG_FEATURE_LIBBUSYBOX_STATIC" = y && LBB_STATIC="-Wl,-static"
+ 
+     EXE="$sharedlib_dir/libbusybox.so.${BB_VER}_unstripped"
++    echo "GG, l_list: $l_list"
+     try $CC $CFLAGS $LDFLAGS \
+ 	    -o $EXE \
+ 	    -shared -fPIC $LBB_STATIC \
+@@ -266,16 +291,22 @@
+ 	    `INFO_OPTS` \
+     || {
+ 	echo "Linking $EXE failed"
++	echo "GG, showing output"
+ 	cat $EXE.out
+ 	exit 1
+     }
++    echo "GG, before strip: "
++    nm -a $EXE
+     $STRIP -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/libbusybox.so.$BB_VER"
+     chmod a+x "$sharedlib_dir/libbusybox.so.$BB_VER"
+     echo "libbusybox: $sharedlib_dir/libbusybox.so.$BB_VER"
+ fi
+ 
++echo "pre HH check"
++
+ if test "$CONFIG_FEATURE_SHARED_BUSYBOX" = y; then
+     EXE="$sharedlib_dir/busybox_unstripped"
++    echo "HH, l_list: $l_list"
+     try $CC $CFLAGS $LDFLAGS \
+ 	    -o $EXE \
+ 	    $SORT_COMMON \
+@@ -287,14 +318,20 @@
+ 	    `INFO_OPTS` \
+     || {
+ 	echo "Linking $EXE failed"
++	echo "HH, showing output"
+ 	cat $EXE.out
+ 	exit 1
+     }
++    echo "HH, before strip: "
++    nm -a $EXE
+     $STRIP -s --remove-section=.note --remove-section=.comment $EXE -o "$sharedlib_dir/busybox"
+     echo "busybox linked against libbusybox: $sharedlib_dir/busybox"
+ fi
+ 
++echo "pre II check"
++
+ if test "$CONFIG_FEATURE_INDIVIDUAL" = y; then
++    echo "II check"
+     echo "Linking individual applets against libbusybox (see $sharedlib_dir/*)"
+     gcc -DNAME_MAIN -E -include include/autoconf.h include/applets.h \
+     | grep -v "^#" \
+@@ -323,10 +360,13 @@
+ 		-Wl,--warn-common \
+ 	|| {
+ 	    echo "Linking $EXE failed"
++	    echo "II, showing output"
+ 	    cat $EXE.out
+ 	    exit 1
+ 	}
+ 	rm -- "$sharedlib_dir/applet.c" $EXE.out
++	echo "II, before strip: "
++	nm -a $EXE
+ 	$STRIP -s --remove-section=.note --remove-section=.comment $EXE
+ 	# Let user see that we do something - list the names of created binaries:
+ 	echo "$EXE"
+@@ -334,6 +374,9 @@
+     done <applet_lst.tmp
+ fi
+ 
++echo "JJ check, nm output"
++nm -a $EXE
++
+ # libbusybox.so is needed only for -lbusybox at link time,
+ # it is not needed at runtime. Deleting to reduce confusion.
+ rm "$sharedlib_dir"/libbusybox.so 2>/dev/null
