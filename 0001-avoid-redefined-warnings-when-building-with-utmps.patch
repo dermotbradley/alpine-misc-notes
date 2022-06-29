@@ -36,23 +36,25 @@ diff -aur a/libbb/messages.c b/libbb/messages.c
 diff -aur a/libbb/utmp.c b/libbb/utmp.c
 --- a/libbb/utmp.c
 +++ b/libbb/utmp.c
-@@ -45,8 +45,7 @@
+@@ -45,8 +45,8 @@
  		tty_name += 3;
  	strncpy(id, tty_name, width);
  
 -	touch(_PATH_UTMPX);
 -	//utmpxname(_PATH_UTMPX);
-+	utmpxname(_CORRECT_PATH_UTMPX);
++	//touch(_CORRECT_PATH_UTMPX);
++	//utmpxname(_CORRECT_PATH_UTMPX);
  	setutxent();
  	/* Append new one (hopefully, unless we collide on ut_id) */
  	pututxline(&utent);
-@@ -67,8 +66,7 @@
+@@ -67,8 +67,8 @@
  	struct utmpx utent;
  	struct utmpx *utp;
  
 -	touch(_PATH_UTMPX);
 -	//utmpxname(_PATH_UTMPX);
-+	utmpxname(_CORRECT_PATH_UTMPX);
++	//touch(_CORRECT_PATH_UTMPX);
++	//utmpxname(_CORRECT_PATH_UTMPX);
  	setutxent();
  
  	/* Did init/getty/telnetd/sshd/... create an entry for us?
